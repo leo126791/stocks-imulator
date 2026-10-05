@@ -3,7 +3,6 @@ package com.example.stock_simulator.ui.screens.market
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.stock_simulator.data.repository.StockRepository
-import com.example.stock_simulator.domain.model.IndustrySector
 import com.example.stock_simulator.domain.model.IntradayTick
 import com.example.stock_simulator.domain.model.MarketIndex
 import com.example.stock_simulator.domain.model.StockQuote
@@ -134,12 +133,19 @@ class MarketViewModel(
     private fun startAutoRefresh() {
         viewModelScope.launch {
             while (true) {
-                delay(60000) // 1 分鐘 (60 秒) 自動輪詢更新即時行情
+                delay(5000) // 每 5 秒自動輪詢更新即時大盤與分時走勢圖
                 if (_uiState.value.searchQuery.isBlank()) {
                     val category = _uiState.value.selectedCategory
                     val indices = stockRepository.getMarketIndices(category)
+                    val currentSymbol = _uiState.value.selectedOverviewSymbol
+                    val selectedIdxItem = indices.find { it.symbol == currentSymbol }
+                    val prevClose = selectedIdxItem?.previousClose ?: 48353.49
+                    val ticks = stockRepository.getIntradayTicks(currentSymbol, prevClose)
+
                     _uiState.value = _uiState.value.copy(
-                        indices = indices
+                        indices = indices,
+                        mainIntradayTicks = ticks,
+                        mainPrevClose = prevClose
                     )
                 }
             }
