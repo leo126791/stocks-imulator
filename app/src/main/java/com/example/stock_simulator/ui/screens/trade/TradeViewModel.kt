@@ -85,14 +85,18 @@ class TradeViewModel(
         val current = _uiState.value
         val quote = current.quote ?: return
 
-        // 檢查是否為大盤指數，指數禁止購買下單
+        // 檢查是否為大盤與台指期指數，指數類別禁止購買下單
         val isIndex = current.symbol.startsWith("tse_") ||
                 current.symbol.startsWith("otc_") ||
-                current.symbol in listOf("t00", "o00", "N225", "DJI", "IXIC", "GSPC", "SOX", "HSI", "KS11", "FTSE", "GDAXI")
+                current.symbol in listOf("t00", "o00", "TX", "N225", "DJI", "IXIC", "GSPC", "SOX", "HSI", "KS11", "FTSE", "GDAXI") ||
+                quote.name.contains("台指") ||
+                quote.name.contains("加權") ||
+                quote.name.contains("櫃買") ||
+                quote.name.contains("指數")
 
         if (isIndex) {
             _uiState.value = current.copy(
-                message = "大盤指數 (${quote.name}) 無法進行買賣下單，請輸入個股代號 (例: 2330)",
+                message = "${quote.name} (${current.symbol}) 為指數類別，無法進行買賣下單，請輸入個股代號 (例: 2330)",
                 isError = true
             )
             return

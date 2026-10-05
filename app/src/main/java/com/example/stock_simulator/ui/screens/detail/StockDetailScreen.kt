@@ -158,7 +158,11 @@ fun StockDetailScreen(
 
                 val isIndex = quote.symbol.startsWith("tse_") ||
                         quote.symbol.startsWith("otc_") ||
-                        quote.symbol in listOf("N225", "DJI", "IXIC", "GSPC", "SOX", "HSI", "KS11", "FTSE", "GDAXI")
+                        quote.symbol in listOf("t00", "o00", "TX", "N225", "DJI", "IXIC", "GSPC", "SOX", "HSI", "KS11", "FTSE", "GDAXI") ||
+                        quote.name.contains("台指") ||
+                        quote.name.contains("加權") ||
+                        quote.name.contains("櫃買") ||
+                        quote.name.contains("指數")
 
                 // 最佳五檔 (若非大盤指數才顯示買賣五檔)
                 if (!isIndex) {
