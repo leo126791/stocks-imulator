@@ -84,7 +84,7 @@ class StockDetailViewModel(
     private fun startRealTimeQuoteRefresh() {
         viewModelScope.launch {
             while (true) {
-                delay(3000) // 3 秒輪詢更新即時報價
+                delay(60000) // 1 分鐘 (60 秒) 輪詢更新個股即時報價
                 try {
                     val updatedQuote = stockRepository.getStockQuote(symbol)
                     _uiState.value = _uiState.value.copy(quote = updatedQuote)

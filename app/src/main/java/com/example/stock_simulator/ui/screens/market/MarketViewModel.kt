@@ -134,7 +134,7 @@ class MarketViewModel(
     private fun startAutoRefresh() {
         viewModelScope.launch {
             while (true) {
-                delay(10000)
+                delay(60000) // 1 分鐘 (60 秒) 自動輪詢更新即時行情
                 if (_uiState.value.searchQuery.isBlank()) {
                     val category = _uiState.value.selectedCategory
                     val indices = stockRepository.getMarketIndices(category)

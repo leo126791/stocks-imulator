@@ -95,7 +95,7 @@ class PortfolioViewModel(
     private fun startOrderMatcherLoop() {
         viewModelScope.launch {
             while (true) {
-                delay(3000) // 每 3 秒檢查一次委託中的限價單並撮合
+                delay(60000) // 1 分鐘 (60 秒) 檢查一次委託中的限價單並撮合
                 try {
                     val pendingOrders = _uiState.value.orders.filter { it.status == OrderStatus.PENDING }
                     if (pendingOrders.isNotEmpty()) {
