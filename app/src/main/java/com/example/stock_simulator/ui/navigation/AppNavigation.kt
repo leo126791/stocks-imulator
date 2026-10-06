@@ -1,5 +1,6 @@
 package com.example.stock_simulator.ui.navigation
 
+import android.net.Uri
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
@@ -78,7 +79,7 @@ fun AppNavigation() {
             composable(BottomNavScreen.Market.route) {
                 MarketScreen(
                     onStockClick = { symbol ->
-                        navController.navigate("detail/$symbol")
+                        navController.navigate("detail/${Uri.encode(symbol)}")
                     }
                 )
             }
@@ -90,7 +91,7 @@ fun AppNavigation() {
                 WatchlistScreen(
                     viewModel = viewModel,
                     onStockClick = { symbol ->
-                        navController.navigate("detail/$symbol")
+                        navController.navigate("detail/${Uri.encode(symbol)}")
                     }
                 )
             }
@@ -103,7 +104,8 @@ fun AppNavigation() {
             }
 
             composable("trade/{symbol}") { backStackEntry ->
-                val symbol = backStackEntry.arguments?.getString("symbol") ?: "2330"
+                val rawSymbol = backStackEntry.arguments?.getString("symbol") ?: "2330"
+                val symbol = Uri.decode(rawSymbol)
                 val viewModel: TradeViewModel = viewModel(factory = SimpleViewModelFactory {
                     TradeViewModel(symbol, database)
                 })
@@ -117,7 +119,7 @@ fun AppNavigation() {
                 PortfolioScreen(
                     viewModel = viewModel,
                     onStockClick = { symbol ->
-                        navController.navigate("detail/$symbol")
+                        navController.navigate("detail/${Uri.encode(symbol)}")
                     }
                 )
             }
@@ -126,7 +128,8 @@ fun AppNavigation() {
                 route = "detail/{symbol}",
                 arguments = listOf(navArgument("symbol") { type = NavType.StringType })
             ) { backStackEntry ->
-                val symbol = backStackEntry.arguments?.getString("symbol") ?: "2330"
+                val rawSymbol = backStackEntry.arguments?.getString("symbol") ?: "2330"
+                val symbol = Uri.decode(rawSymbol)
                 val viewModel: StockDetailViewModel = viewModel(factory = SimpleViewModelFactory {
                     StockDetailViewModel(symbol, database)
                 })
@@ -134,7 +137,7 @@ fun AppNavigation() {
                     viewModel = viewModel,
                     onBackClick = { navController.popBackStack() },
                     onTradeClick = { targetSymbol ->
-                        navController.navigate("trade/$targetSymbol")
+                        navController.navigate("trade/${Uri.encode(targetSymbol)}")
                     }
                 )
             }

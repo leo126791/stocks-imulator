@@ -31,7 +31,7 @@ class SimulatorRepository(private val database: StockDatabase) {
 
     val accountFlow: Flow<Account> = accountDao.getAccountFlow().map { entity ->
         if (entity == null) {
-            val newAcc = AccountEntity(id = 1, cashBalance = 200000.0, initialCapital = 200000.0)
+            val newAcc = AccountEntity(id = 1, cashBalance = 200000.0, initialCapital = 200000.0, isVip = false)
             accountDao.insertOrUpdateAccount(newAcc)
             newAcc.toDomainModel()
         } else if (entity.initialCapital == 1000000.0) {
@@ -56,6 +56,13 @@ class SimulatorRepository(private val database: StockDatabase) {
         list.map { it.toDomainModel() }
     }
 
+    suspend fun upgradeToVip() = withContext(Dispatchers.IO) {
+        val currentAccount = accountDao.getAccount()
+            ?: AccountEntity(id = 1, cashBalance = 200000.0, initialCapital = 200000.0, isVip = false)
+        val updated = currentAccount.copy(isVip = true)
+        accountDao.insertOrUpdateAccount(updated)
+    }
+
     suspend fun executeTrade(
         symbol: String,
         name: String,
@@ -71,7 +78,7 @@ class SimulatorRepository(private val database: StockDatabase) {
         }
 
         var currentAccount = accountDao.getAccount()
-            ?: AccountEntity(id = 1, cashBalance = 200000.0, initialCapital = 200000.0)
+            ?: AccountEntity(id = 1, cashBalance = 200000.0, initialCapital = 200000.0, isVip = false)
 
         if (currentAccount.initialCapital == 1000000.0) {
             currentAccount = currentAccount.copy(cashBalance = 200000.0, initialCapital = 200000.0)
@@ -320,8 +327,8 @@ class SimulatorRepository(private val database: StockDatabase) {
     }
 
     suspend fun resetAccount() = withContext(Dispatchers.IO) {
-        accountDao.insertOrUpdateAccount(AccountEntity(id = 1, cashBalance = 200000.0, initialCapital = 200000.0))
+        accountDao.insertOrUpdateAccount(AccountEntity(id = 1, cashBalance = 200000.0, initialCapital = 200000.0, isVip = false))
         database.clearAllTables()
-        accountDao.insertOrUpdateAccount(AccountEntity(id = 1, cashBalance = 200000.0, initialCapital = 200000.0))
+        accountDao.insertOrUpdateAccount(AccountEntity(id = 1, cashBalance = 200000.0, initialCapital = 200000.0, isVip = false))
     }
 }

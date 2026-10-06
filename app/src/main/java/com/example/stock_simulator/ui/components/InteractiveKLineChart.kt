@@ -221,7 +221,7 @@ fun InteractiveKLineChart(
                         horizontalArrangement = Arrangement.Start,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        val activeIdx = if (selectedIndex in currentMA5.indices) selectedIndex else currentMA5.size - 1
+                        val activeIdx = if (selectedIndex in currentMA5.indices) selectedIndex else (currentMA5.size - 1).coerceAtLeast(0)
 
                         MATag(
                             label = "MA5",
@@ -271,8 +271,8 @@ fun InteractiveKLineChart(
                     Text("載入 K 線資料中...", style = MaterialTheme.typography.bodyMedium)
                 }
             } else {
-                val minPrice = kLines.minOf { it.low }
-                val maxPrice = kLines.maxOf { it.high }
+                val minPrice = kLines.minOfOrNull { it.low } ?: 100.0
+                val maxPrice = kLines.maxOfOrNull { it.high } ?: 100.0
                 val priceRange = if (maxPrice > minPrice) maxPrice - minPrice else 1.0
 
                 Canvas(
@@ -290,13 +290,13 @@ fun InteractiveKLineChart(
                         }
                         .pointerInput(kLines) {
                             detectTapGestures { offset ->
-                                val barWidth = size.width / kLines.size
+                                val barWidth = size.width / kLines.size.coerceAtLeast(1)
                                 selectedIndex = (offset.x / barWidth).toInt().coerceIn(0, kLines.size - 1)
                             }
                         }
                         .pointerInput(kLines) {
                             detectDragGestures { change, _ ->
-                                val barWidth = size.width / kLines.size
+                                val barWidth = size.width / kLines.size.coerceAtLeast(1)
                                 selectedIndex = (change.position.x / barWidth).toInt().coerceIn(0, kLines.size - 1)
                             }
                         }
@@ -305,7 +305,7 @@ fun InteractiveKLineChart(
                     val height = size.height * 0.75f // 主 K 線圖佔上方 75%
                     val volHeight = size.height * 0.20f // 下方成交量佔 20%
 
-                    val barWidth = width / kLines.size
+                    val barWidth = width / kLines.size.coerceAtLeast(1)
                     val candleWidth = maxOf(barWidth * 0.65f, 3f)
 
                     // A. 繪製背景虛線網格 (Y 軸 4 等分)
@@ -340,7 +340,7 @@ fun InteractiveKLineChart(
                     val minIndex = kLines.indexOfFirst { it.low == minPrice }
 
                     // B. 繪製 K 線柱體與影線，以及成交量柱狀圖
-                    val maxVol = kLines.maxOf { it.volume }.toDouble().coerceAtLeast(1.0)
+                    val maxVol = kLines.maxOfOrNull { it.volume }?.toDouble()?.coerceAtLeast(1.0) ?: 1.0
 
                     kLines.forEachIndexed { index, kline ->
                         val x = index * barWidth + barWidth / 2

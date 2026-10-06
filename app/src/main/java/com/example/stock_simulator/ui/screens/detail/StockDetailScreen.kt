@@ -40,6 +40,7 @@ import com.example.stock_simulator.ui.components.OrderBookView
 import com.example.stock_simulator.ui.components.StockPriceText
 import com.example.stock_simulator.ui.theme.StockGreen
 import com.example.stock_simulator.ui.theme.StockRed
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -119,10 +120,10 @@ fun StockDetailScreen(
 
                 // 開/高/低/量 行情概覽
                 Row(modifier = Modifier.fillMaxWidth()) {
-                    Text("開盤: ${quote.openPrice}", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
-                    Text("最高: ${quote.highPrice}", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
-                    Text("最低: ${quote.lowPrice}", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
-                    Text("成交: ${quote.volume}張", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+                    Text("開盤: ${String.format(Locale.TAIWAN, "%.2f", quote.openPrice)}", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+                    Text("最高: ${String.format(Locale.TAIWAN, "%.2f", quote.highPrice)}", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+                    Text("最低: ${String.format(Locale.TAIWAN, "%.2f", quote.lowPrice)}", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+                    Text("成交: ${String.format(Locale.TAIWAN, "%,d", quote.volume)}張", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -144,13 +145,13 @@ fun StockDetailScreen(
                 Spacer(modifier = Modifier.height(12.dp))
 
                 if (uiState.chartTab == 0) {
-                    // Yahoo! 股市風格 盤中即時分時圖 (09:00 - 13:30 趨勢折線 + 昨收線)
+                    // 盤中即時分時圖
                     IntradayTrendChart(
                         ticks = uiState.intradayTicks,
                         previousClose = quote.previousClose
                     )
                 } else {
-                    // Yahoo! 股市風格 專業 K 線圖 (MA均線 + 十字準星 + 極值標註)
+                    // 專業 K 線圖
                     InteractiveKLineChart(allKLines = uiState.kLines)
                 }
 

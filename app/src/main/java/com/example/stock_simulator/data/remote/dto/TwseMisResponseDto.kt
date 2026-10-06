@@ -21,5 +21,7 @@ data class StockMsgDto(
     @SerializedName("g") val buyVolumes: String? = null,     // 買量清單 (用 _ 分隔)
     @SerializedName("a") val sellPrices: String? = null,     // 賣價清單 (用 _ 分隔)
     @SerializedName("f") val sellVolumes: String? = null,    // 賣量清單 (用 _ 分隔)
-    @SerializedName("tlong") val timestamp: String? = null   // 搓合時間 (毫秒)
+    @SerializedName("pz") val trialPrice: String? = null,    // 試撮成交價 (08:30-09:00 & 13:25-13:30)
+    @SerializedName("ps") val trialVolume: String? = null,   // 試撮成交量 (張)
+    @SerializedName("tlong") val timestamp: String? = null   // 撮合時間 (毫秒)
 )

@@ -62,7 +62,7 @@ fun OrderBookView(
                         .padding(vertical = 2.dp)
                 ) {
                     Text(
-                        text = buyVol?.toString() ?: "-",
+                        text = buyVol?.let { String.format(Locale.TAIWAN, "%,d", it) } ?: "-",
                         modifier = Modifier.weight(1f),
                         style = MaterialTheme.typography.bodySmall
                     )
@@ -87,7 +87,7 @@ fun OrderBookView(
                         textAlign = TextAlign.Center
                     )
                     Text(
-                        text = sellVol?.toString() ?: "-",
+                        text = sellVol?.let { String.format(Locale.TAIWAN, "%,d", it) } ?: "-",
                         modifier = Modifier.weight(1f),
                         style = MaterialTheme.typography.bodySmall,
                         textAlign = TextAlign.End

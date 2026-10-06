@@ -24,7 +24,7 @@ import kotlinx.coroutines.launch
         OrderEntity::class,
         WatchlistEntity::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 abstract class StockDatabase : RoomDatabase() {
@@ -43,13 +43,15 @@ abstract class StockDatabase : RoomDatabase() {
                     context.applicationContext,
                     StockDatabase::class.java,
                     "stock_simulator_db"
-                ).addCallback(object : Callback() {
+                )
+                .fallbackToDestructiveMigration(true)
+                .addCallback(object : Callback() {
                     override fun onCreate(db: SupportSQLiteDatabase) {
                         super.onCreate(db)
                         // Seed default initial account capital ($200,000 TWD)
                         CoroutineScope(Dispatchers.IO).launch {
                             getDatabase(context).accountDao().insertOrUpdateAccount(
-                                AccountEntity(id = 1, cashBalance = 200000.0, initialCapital = 200000.0)
+                                AccountEntity(id = 1, cashBalance = 200000.0, initialCapital = 200000.0, isVip = false)
                             )
                             // Seed default watchlist
                             val watchlistDao = getDatabase(context).watchlistDao()

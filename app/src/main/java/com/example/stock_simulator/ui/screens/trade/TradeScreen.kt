@@ -12,6 +12,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -23,7 +24,9 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -32,9 +35,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.example.stock_simulator.domain.model.OrderPriceType
 import com.example.stock_simulator.domain.model.OrderType
 import com.example.stock_simulator.ui.theme.StockGreen
@@ -56,6 +62,48 @@ fun TradeScreen(
         }
     }
 
+    // 👑 VIP 升級開通視窗 (當試圖啟用盤後交易且未開通 VIP 時跳出，引導至 Google Play Store 訂閱)
+    if (uiState.showVipDialog) {
+        AlertDialog(
+            onDismissRequest = { viewModel.dismissVipDialog() },
+            icon = {
+                Text("👑", fontSize = 36.sp)
+            },
+            title = {
+                Text("訂閱 VIP 尊榮會員", fontWeight = FontWeight.Bold)
+            },
+            text = {
+                Column {
+                    Text(
+                        text = "「盤後模擬交易」為 VIP 會員專屬功能！",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text("前往 Google Play 商店訂閱 VIP 即可解鎖：", fontSize = 13.sp)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text("• 24 小時全天候盤後模擬下單交易", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("• 零時差即時行情與 K 線專業圖表", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("• 無限次資產模擬與投資組合試算", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = { viewModel.requestGooglePlayPurchase() },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                ) {
+                    Text("🛒 前往 Google Play 商店訂閱", fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { viewModel.dismissVipDialog() }) {
+                    Text("稍後再說")
+                }
+            }
+        )
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -71,18 +119,39 @@ fun TradeScreen(
                 .verticalScroll(rememberScrollState())
                 .padding(16.dp)
         ) {
-            // 帳戶可用資金卡片
+            // 1. 帳戶可用資金卡片 (含 VIP 勳章標籤)
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Text(
-                        text = "可用現金餘額",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "可用現金餘額",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                        Spacer(modifier = Modifier.weight(1f))
+                        if (uiState.account?.isVip == true) {
+                            Surface(
+                                color = Color(0xFFFFD700), // 尊榮金色
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Text(
+                                    text = "👑 VIP 尊榮會員",
+                                    style = TextStyle(fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.Black),
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
                     Text(
                         text = "NT$ ${String.format(Locale.TAIWAN, "%,.0f", uiState.account?.cashBalance ?: 200000.0)}",
                         style = MaterialTheme.typography.headlineMedium,
@@ -92,9 +161,43 @@ fun TradeScreen(
                 }
             }
 
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // 2. 盤中常規交易時間狀態卡片 (台股 09:00 ~ 13:30)
+            val marketStatusBg = if (uiState.isMarketOpen) StockGreen.copy(alpha = 0.15f) else StockRed.copy(alpha = 0.15f)
+            val marketStatusText = if (uiState.isMarketOpen) "🟢 台股常規交易中 (開盤時間 09:00 ~ 13:30)" else "🔴 台股休市中 (開盤時間為週一至週五 09:00 ~ 13:30)"
+            val marketStatusColor = if (uiState.isMarketOpen) StockGreen else StockRed
+
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(10.dp),
+                colors = CardDefaults.cardColors(containerColor = marketStatusBg)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = marketStatusText,
+                        style = MaterialTheme.typography.bodyMedium.copy(fontSize = 13.sp),
+                        fontWeight = FontWeight.Bold,
+                        color = marketStatusColor,
+                        modifier = Modifier.weight(1f)
+                    )
+
+                    FilterChip(
+                        selected = uiState.enforceTradingHours,
+                        onClick = { viewModel.onEnforceTradingHoursChanged(!uiState.enforceTradingHours) },
+                        label = { Text(if (uiState.enforceTradingHours) "限開盤交易" else "👑 盤後模擬 (VIP)", fontSize = 11.sp) }
+                    )
+                }
+            }
+
             Spacer(modifier = Modifier.height(16.dp))
 
-            // 選擇股票代號
+            // 3. 選擇股票代號
             OutlinedTextField(
                 value = uiState.symbol,
                 onValueChange = { viewModel.onSymbolChanged(it) },
@@ -115,7 +218,7 @@ fun TradeScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // 買進 / 賣出 切換
+            // 4. 買進 / 賣出 切換
             Text("交易類型", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
             Row(modifier = Modifier.padding(top = 8.dp)) {
                 Button(
@@ -143,7 +246,7 @@ fun TradeScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // 市價 / 限價 切換
+            // 5. 市價 / 限價 切換
             Text("價格類型", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
             Row(modifier = Modifier.padding(top = 8.dp)) {
                 FilterChip(
@@ -172,7 +275,7 @@ fun TradeScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // 委託股數
+            // 6. 委託股數
             OutlinedTextField(
                 value = uiState.shares,
                 onValueChange = { viewModel.onSharesChanged(it) },
@@ -213,7 +316,7 @@ fun TradeScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // 送出下單按鈕
+            // 7. 送出下單按鈕
             Button(
                 onClick = { viewModel.submitTrade() },
                 modifier = Modifier
@@ -224,7 +327,7 @@ fun TradeScreen(
                 )
             ) {
                 Text(
-                    text = if (uiState.orderType == OrderType.BUY) "確認買进模擬下單" else "確認賣出模擬下單",
+                    text = if (uiState.orderType == OrderType.BUY) "確認買進模擬下單" else "確認賣出模擬下單",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )

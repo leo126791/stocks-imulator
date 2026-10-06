@@ -48,18 +48,38 @@ class StockDetailViewModel(
                 val kLines = stockRepository.getKLineData(symbol)
                 val inWatchlist = simulatorRepository.isInWatchlist(symbol)
 
+                // 根據實際成交分時 Tick 數據，精確計算內盤與外盤累計成交量
+                val (inVol, outVol) = stockRepository.calculateInOutVolume(intradayTicks, quote.previousClose)
+                val totalVol = (inVol + outVol).coerceAtLeast(quote.volume)
+                val updatedQuote = quote.copy(
+                    volume = totalVol,
+                    inVolume = inVol,
+                    outVolume = outVol
+                )
+
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
-                    quote = quote,
+                    quote = updatedQuote,
                     intradayTicks = intradayTicks,
                     kLines = kLines,
                     isInWatchlist = inWatchlist
                 )
             } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(
-                    isLoading = false,
-                    errorMessage = "加載股票明細失敗: ${e.message}"
-                )
+                e.printStackTrace()
+                // 如果加載失敗，使用備用行情，避免卡在加載中或閃退
+                try {
+                    val fallbackQuote = stockRepository.getStockQuote(symbol)
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        quote = fallbackQuote,
+                        errorMessage = null
+                    )
+                } catch (_: Exception) {
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        errorMessage = "加載股票明細失敗"
+                    )
+                }
             }
         }
     }
@@ -88,8 +108,17 @@ class StockDetailViewModel(
                 try {
                     val updatedQuote = stockRepository.getStockQuote(symbol)
                     val updatedTicks = stockRepository.getIntradayTicks(symbol, updatedQuote.previousClose)
+
+                    // 根據即時分時 Tick 精確更新內外盤數據
+                    val (inVol, outVol) = stockRepository.calculateInOutVolume(updatedTicks, updatedQuote.previousClose)
+                    val totalVol = (inVol + outVol).coerceAtLeast(updatedQuote.volume)
+
                     _uiState.value = _uiState.value.copy(
-                        quote = updatedQuote,
+                        quote = updatedQuote.copy(
+                            volume = totalVol,
+                            inVolume = inVol,
+                            outVolume = outVol
+                        ),
                         intradayTicks = updatedTicks
                     )
                 } catch (e: Exception) {

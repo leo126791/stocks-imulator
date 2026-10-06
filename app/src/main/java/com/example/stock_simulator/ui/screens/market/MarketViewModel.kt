@@ -15,7 +15,6 @@ import kotlinx.coroutines.launch
 data class MarketUiState(
     val isLoading: Boolean = true,
     val searchQuery: String = "",
-    val selectedCategory: String = "台股",
     val selectedOverviewSymbol: String = "tse_t00",
     val indices: List<MarketIndex> = emptyList(),
     val mainIntradayTicks: List<IntradayTick> = emptyList(),
@@ -41,8 +40,7 @@ class MarketViewModel(
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, errorMessage = null)
             try {
-                val category = _uiState.value.selectedCategory
-                var indices = stockRepository.getMarketIndices(category)
+                var indices = stockRepository.getMarketIndices("台股")
 
                 // 確保台股有 加權指, 櫃買指, 台指近 三大指標卡片
                 if (indices.none { it.symbol == "TX" }) {
@@ -68,8 +66,11 @@ class MarketViewModel(
                 val prevClose = selectedIdxItem?.previousClose ?: 48353.49
                 val ticks = stockRepository.getIntradayTicks(currentSymbol, prevClose)
 
-                // 調用 TWSE/TPEX 官方開放 API 載入全台股所有股票 (2000+ 檔)
-                val allTaiwanStocks = stockRepository.getAllTaiwanStocks()
+                // 調用 API 載入全台股所有股票 (~2000+ 檔)
+                var allTaiwanStocks = stockRepository.getAllTaiwanStocks()
+                if (allTaiwanStocks.isEmpty()) {
+                    allTaiwanStocks = stockRepository.getFallbackStockList()
+                }
 
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
@@ -80,9 +81,11 @@ class MarketViewModel(
                     filteredQuotes = filterQuotes(allTaiwanStocks, _uiState.value.searchQuery)
                 )
             } catch (e: Exception) {
+                val fallbackStocks = stockRepository.getFallbackStockList()
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
-                    errorMessage = "加載行情失敗: ${e.message}"
+                    quotes = fallbackStocks,
+                    filteredQuotes = filterQuotes(fallbackStocks, _uiState.value.searchQuery)
                 )
             }
         }
@@ -102,18 +105,13 @@ class MarketViewModel(
         }
     }
 
-    fun onCategorySelected(category: String) {
-        viewModelScope.launch {
-            val indices = stockRepository.getMarketIndices(category)
-            _uiState.value = _uiState.value.copy(
-                selectedCategory = category,
-                indices = indices
-            )
-        }
-    }
-
     fun onSearchQueryChanged(query: String) {
-        val currentQuotes = _uiState.value.quotes
+        val currentQuotes = if (_uiState.value.quotes.isNotEmpty()) {
+            _uiState.value.quotes
+        } else {
+            stockRepository.getFallbackStockList()
+        }
+
         _uiState.value = _uiState.value.copy(
             searchQuery = query,
             filteredQuotes = filterQuotes(currentQuotes, query)
@@ -121,32 +119,57 @@ class MarketViewModel(
     }
 
     private fun filterQuotes(quotes: List<StockQuote>, query: String): List<StockQuote> {
-        if (query.isBlank()) {
-            // 預設展示前 30 檔熱門股票與權值股
-            return quotes.take(30)
+        val sourceQuotes = if (quotes.isNotEmpty()) quotes else stockRepository.getFallbackStockList()
+        val cleanQuery = query.trim()
+
+        if (cleanQuery.isBlank()) {
+            return sourceQuotes.distinctBy { it.symbol }.take(30)
         }
-        return quotes.filter { quote ->
-            quote.symbol.contains(query, ignoreCase = true) || quote.name.contains(query, ignoreCase = true)
-        }
+
+        // 搜尋比對代號與名稱（不區分大小寫），並根據相符程度排序：
+        // 1. 完全相同
+        // 2. 代號或名稱以關鍵字開頭 (例如輸入 "23" -> "2330", "2317" 優先)
+        // 3. 代號或名稱包含關鍵字
+        return sourceQuotes
+            .filter { quote ->
+                quote.symbol.contains(cleanQuery, ignoreCase = true) ||
+                quote.name.contains(cleanQuery, ignoreCase = true)
+            }
+            .distinctBy { it.symbol }
+            .sortedWith(
+                compareByDescending<StockQuote> { quote ->
+                    if (quote.symbol.equals(cleanQuery, ignoreCase = true) || quote.name.equals(cleanQuery, ignoreCase = true)) 3
+                    else if (quote.symbol.startsWith(cleanQuery, ignoreCase = true) || quote.name.startsWith(cleanQuery, ignoreCase = true)) 2
+                    else 1
+                }.thenBy { it.symbol }
+            )
     }
 
     private fun startAutoRefresh() {
         viewModelScope.launch {
             while (true) {
-                delay(5000) // 每 5 秒自動輪詢更新即時大盤與分時走勢圖
-                if (_uiState.value.searchQuery.isBlank()) {
-                    val category = _uiState.value.selectedCategory
-                    val indices = stockRepository.getMarketIndices(category)
+                delay(3000) // 每 3 秒即時自動輪詢更新大盤與全台股行情
+                try {
+                    val indices = stockRepository.getMarketIndices("台股")
                     val currentSymbol = _uiState.value.selectedOverviewSymbol
                     val selectedIdxItem = indices.find { it.symbol == currentSymbol }
                     val prevClose = selectedIdxItem?.previousClose ?: 48353.49
                     val ticks = stockRepository.getIntradayTicks(currentSymbol, prevClose)
 
+                    var allTaiwanStocks = stockRepository.getAllTaiwanStocks()
+                    if (allTaiwanStocks.isEmpty()) {
+                        allTaiwanStocks = stockRepository.getFallbackStockList()
+                    }
+
                     _uiState.value = _uiState.value.copy(
                         indices = indices,
                         mainIntradayTicks = ticks,
-                        mainPrevClose = prevClose
+                        mainPrevClose = prevClose,
+                        quotes = allTaiwanStocks,
+                        filteredQuotes = filterQuotes(allTaiwanStocks, _uiState.value.searchQuery)
                     )
+                } catch (e: Exception) {
+                    e.printStackTrace()
                 }
             }
         }

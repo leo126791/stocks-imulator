@@ -45,6 +45,7 @@ import com.example.stock_simulator.ui.theme.StockFlat
 import com.example.stock_simulator.ui.theme.StockGreen
 import com.example.stock_simulator.ui.theme.StockRed
 import java.util.Locale
+import kotlin.math.abs
 
 @Composable
 fun IntradayTrendChart(
@@ -164,9 +165,16 @@ fun IntradayTrendChart(
                 }
             } else {
                 val prices = visibleTicks.map { it.price }
-                val minPrice = minOf(prices.minOrNull() ?: previousClose, previousClose)
-                val maxPrice = maxOf(prices.maxOrNull() ?: previousClose, previousClose)
-                val priceRange = if (maxPrice > minPrice) maxPrice - minPrice else 1.0
+                val rawMin = prices.minOrNull() ?: previousClose
+                val rawMax = prices.maxOrNull() ?: previousClose
+                val maxDiff = maxOf(abs(rawMax - previousClose), abs(rawMin - previousClose), previousClose * 0.002).coerceAtLeast(0.01)
+
+                val displayMax = previousClose + maxDiff
+                val displayMin = previousClose - maxDiff
+                val priceRange = displayMax - displayMin
+
+                // 全天 09:00 到 13:30 共 54 個時間區間
+                val totalSlots = 54
 
                 Canvas(
                     modifier = Modifier
@@ -183,13 +191,13 @@ fun IntradayTrendChart(
                         }
                         .pointerInput(visibleTicks) {
                             detectTapGestures { offset ->
-                                val stepX = size.width / (visibleTicks.size - 1).coerceAtLeast(1)
+                                val stepX = size.width / totalSlots.toFloat()
                                 selectedIndex = (offset.x / stepX).toInt().coerceIn(0, visibleTicks.size - 1)
                             }
                         }
                         .pointerInput(visibleTicks) {
                             detectDragGestures { change, _ ->
-                                val stepX = size.width / (visibleTicks.size - 1).coerceAtLeast(1)
+                                val stepX = size.width / totalSlots.toFloat()
                                 selectedIndex = (change.position.x / stepX).toInt().coerceIn(0, visibleTicks.size - 1)
                             }
                         }
@@ -198,7 +206,8 @@ fun IntradayTrendChart(
                     val height = size.height * 0.75f // 主圖高佔 75%
                     val volHeight = size.height * 0.20f // 下方成交量高佔 20%
 
-                    val stepX = width / (visibleTicks.size - 1).coerceAtLeast(1)
+                    val stepX = width / totalSlots.toFloat()
+                    val baseLineY = height / 2f
 
                     // A. 畫 5 條水平虛線與價格刻度 (Y 軸)
                     val gridCount = 4
@@ -207,38 +216,45 @@ fun IntradayTrendChart(
 
                     for (i in 0..gridCount) {
                         val y = height - (i.toFloat() / gridCount) * height
-                        val priceLabel = minPrice + i * priceStep
+                        val priceLabel = displayMin + i * priceStep
 
-                        drawLine(
-                            color = Color.LightGray.copy(alpha = 0.35f),
-                            start = Offset(0f, y),
-                            end = Offset(width, y),
-                            pathEffect = dashEffect,
-                            strokeWidth = 1f
-                        )
+                        if (i != 2) {
+                            drawLine(
+                                color = Color.LightGray.copy(alpha = 0.35f),
+                                start = Offset(0f, y),
+                                end = Offset(width, y),
+                                pathEffect = dashEffect,
+                                strokeWidth = 1f
+                            )
+                        }
 
-                        // 刻度文字
+                        val textY = when (i) {
+                            gridCount -> 2.dp.toPx()
+                            0 -> height - 12.dp.toPx()
+                            else -> y - 8.dp.toPx()
+                        }
+
+                        // 刻度文字 (放置於左側)
                         drawText(
                             textMeasurer = textMeasurer,
                             text = String.format(Locale.TAIWAN, "%,.1f", priceLabel),
                             style = TextStyle(color = Color.Gray, fontSize = 9.sp),
-                            topLeft = Offset(width - 45.dp.toPx(), y - 10.dp.toPx())
+                            topLeft = Offset(4.dp.toPx(), textY)
                         )
                     }
 
                     // B. 畫 昨收 基準線 (白色虛線與昨收價標籤)
-                    val baseLineY = height - ((previousClose - minPrice) / priceRange * height).toFloat()
                     drawLine(
                         color = Color.White.copy(alpha = 0.9f),
                         start = Offset(0f, baseLineY),
                         end = Offset(width, baseLineY),
                         pathEffect = PathEffect.dashPathEffect(floatArrayOf(12f, 8f), 0f),
-                        strokeWidth = 2f
+                        strokeWidth = 1.5f
                     )
 
-                    // 昨收價黑底框與文字
+                    // 昨收價黑底框與文字 (放置於右側)
                     val baseBadgeWidth = 62.dp.toPx()
-                    val baseBadgeHeight = 18.dp.toPx()
+                    val baseBadgeHeight = 16.dp.toPx()
                     drawRect(
                         color = Color.DarkGray,
                         topLeft = Offset(width - baseBadgeWidth, baseLineY - baseBadgeHeight / 2),
@@ -248,7 +264,7 @@ fun IntradayTrendChart(
                         textMeasurer = textMeasurer,
                         text = "昨收 ${String.format(Locale.TAIWAN, "%,.1f", previousClose)}",
                         style = TextStyle(color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold),
-                        topLeft = Offset(width - baseBadgeWidth + 2.dp.toPx(), baseLineY - baseBadgeHeight / 2 + 2.dp.toPx())
+                        topLeft = Offset(width - baseBadgeWidth + 2.dp.toPx(), baseLineY - baseBadgeHeight / 2 + 1.dp.toPx())
                     )
 
                     // C. 畫時間刻度線與文字
@@ -267,11 +283,11 @@ fun IntradayTrendChart(
                             textMeasurer = textMeasurer,
                             text = label,
                             style = TextStyle(color = Color.Gray, fontSize = 9.sp),
-                            topLeft = Offset((x - 12.dp.toPx()).coerceIn(0f, width - 25.dp.toPx()), size.height - 14.dp.toPx())
+                            topLeft = Offset((x - 12.dp.toPx()).coerceIn(0f, width - 28.dp.toPx()), size.height - 14.dp.toPx())
                         )
                     }
 
-                    // D. 畫藍色/紅色走勢折線與區域漸層填充
+                    // D. 畫藍色走勢折線與區域漸層填充
                     val linePath = Path()
                     val fillPath = Path()
 
@@ -279,7 +295,7 @@ fun IntradayTrendChart(
 
                     visibleTicks.forEachIndexed { i, tick ->
                         val x = i * stepX
-                        val y = height - ((tick.price - minPrice) / priceRange * height).toFloat()
+                        val y = height / 2f - ((tick.price - previousClose) / maxDiff * (height / 2f)).toFloat()
 
                         if (i == 0) {
                             linePath.moveTo(x, y)
@@ -315,7 +331,7 @@ fun IntradayTrendChart(
                     )
 
                     // E. 下方成交量柱圖 (Red/Green)
-                    val maxVol = visibleTicks.maxOf { it.volume }.toDouble().coerceAtLeast(1.0)
+                    val maxVol = visibleTicks.maxOfOrNull { it.volume }?.toDouble()?.coerceAtLeast(1.0) ?: 1.0
                     visibleTicks.forEachIndexed { i, tick ->
                         val x = i * stepX
                         val vHeight = (tick.volume / maxVol * volHeight).toFloat()
@@ -333,19 +349,19 @@ fun IntradayTrendChart(
                     if (selectedIndex in visibleTicks.indices) {
                         val selTick = visibleTicks[selectedIndex]
                         val selX = selectedIndex * stepX
-                        val selY = height - ((selTick.price - minPrice) / priceRange * height).toFloat()
+                        val selY = height / 2f - ((selTick.price - previousClose) / maxDiff * (height / 2f)).toFloat()
 
                         // 垂直準星
                         drawLine(
-                            color = Color.Black,
+                            color = Color.White.copy(alpha = 0.8f),
                             start = Offset(selX, 0f),
                             end = Offset(selX, size.height - 16.dp.toPx()),
-                            strokeWidth = 2f
+                            strokeWidth = 1.5f
                         )
 
                         // 水平準星
                         drawLine(
-                            color = Color.Black,
+                            color = Color.White.copy(alpha = 0.8f),
                             start = Offset(0f, selY),
                             end = Offset(width, selY),
                             strokeWidth = 1.5f
